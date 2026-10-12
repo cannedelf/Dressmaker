@@ -73,9 +73,9 @@ test('v2 save migrates: strings backed up, nothing marked used, everything else 
     log: [{ action: 'Concept', result: 'Animal: Fox' }],
   };
   const s = S.normalise(JSON.parse(JSON.stringify(v2)));
-  assert.strictEqual(s.version, 3);
+  assert.strictEqual(s.version, S.SCHEMA_VERSION);
   assert.deepStrictEqual(s.conceptPoolBackup, v2.conceptPool);
-  assert.deepStrictEqual(s.conceptPool.map((c) => c.text), v2.conceptPool);
+  assert.deepStrictEqual(s.conceptPool.slice(0, 2).map((c) => c.text), v2.conceptPool); // new defaults are added after
   assert.deepStrictEqual(s.usedConcepts, {}, 'no bulk marking');
   assert.strictEqual(s.commission.rolledConceptId, byText(s.conceptPool, 'Animal: Fox').id);
   assert.strictEqual(s.friendships.Edith, 3);

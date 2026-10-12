@@ -9,6 +9,8 @@
  *   3 — concept progression: `conceptPool` becomes [{ id, text }] with stable IDs,
  *       `usedConcepts`, `chapter`, `practice`. The v2 string list is kept untouched
  *       in `conceptPoolBackup`. Nothing is marked used by the migration.
+ *   4 — default concept updates (data.js `conceptUpdates`) applied once to existing
+ *       saves and recorded in `conceptUpdates`.
  */
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -16,7 +18,7 @@
   const P = isNode ? require('./patterns.js') : root.FR_PATTERNS;
 
   const STORAGE_KEY = 'crobat-sunshine-fashion-roulette-v1';
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
   const OVERRIDES = ['auto', 'unlocked', 'locked'];
 
   const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
@@ -62,6 +64,41 @@
     return items;
   }
 
+  /*
+   * Bring an existing save's concept pool up to date with the default list:
+   * rename and remove only exact matches, add missing defaults, keep custom concepts.
+   * A renamed concept keeps its Used status (moved to the new ID).
+   */
+  function applyConceptUpdate(s, update) {
+    const norm = (t) => t.trim().toLowerCase();
+    const taken = new Set(s.conceptPool.map((c) => c.id).concat(Object.keys(s.usedConcepts)));
+    const has = (text) => s.conceptPool.some((c) => norm(c.text) === norm(text));
+
+    for (const [from, to] of Object.entries(update.rename || {})) {
+      const old = s.conceptPool.find((c) => norm(c.text) === norm(from));
+      if (!old) continue;
+      const existing = s.conceptPool.find((c) => norm(c.text) === norm(to));
+      const target = existing || old;
+      if (!existing) {
+        target.text = to;
+        const id = newConceptId(to, taken);
+        if (s.usedConcepts[old.id]) s.usedConcepts[id] = s.usedConcepts[old.id];
+        if (s.commission.rolledConceptId === old.id) s.commission.rolledConceptId = id;
+        target.id = id;
+      } else {
+        if (s.usedConcepts[old.id] && !s.usedConcepts[existing.id]) s.usedConcepts[existing.id] = s.usedConcepts[old.id];
+        if (s.commission.rolledConceptId === old.id) s.commission.rolledConceptId = existing.id;
+        s.conceptPool = s.conceptPool.filter((c) => c !== old);
+      }
+    }
+    // Removed concepts leave their Used records and past commissions untouched.
+    const removed = new Set((update.remove || []).map(norm));
+    s.conceptPool = s.conceptPool.filter((c) => !removed.has(norm(c.text)));
+    for (const text of update.add || []) {
+      if (!has(text)) s.conceptPool.push({ id: newConceptId(text, taken), text });
+    }
+  }
+
   function defaultFriendships() {
     return Object.fromEntries(P.CLIENTS.map((c) => [c, 0]));
   }
@@ -78,6 +115,7 @@
       includeNone: false,
       conceptPool: toConceptItems(D.concepts),
       usedConcepts: {},
+      conceptUpdates: D.conceptUpdates.map((u) => u.id), // defaults already include them
       chapter: 1,
       practice: false,
       slots: blankSlots(),
@@ -118,6 +156,16 @@
     s.usedConcepts = {};
     for (const [id, u] of Object.entries(isObj(src.usedConcepts) ? src.usedConcepts : {})) {
       if (isObj(u)) s.usedConcepts[id] = { usedAt: u.usedAt || null, by: typeof u.by === 'string' ? u.by : '' };
+    }
+    s.conceptUpdates = Array.isArray(src.conceptUpdates) ? src.conceptUpdates.filter((x) => typeof x === 'string') : [];
+    if (Array.isArray(src.conceptPool)) {
+      for (const update of D.conceptUpdates) {
+        if (s.conceptUpdates.includes(update.id)) continue;
+        applyConceptUpdate(s, update);
+        s.conceptUpdates.push(update.id);
+      }
+    } else {
+      s.conceptUpdates = D.conceptUpdates.map((u) => u.id);
     }
     const chapter = Math.floor(Number(src.chapter));
     s.chapter = Number.isFinite(chapter) && chapter >= 1 ? chapter : 1;

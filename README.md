@@ -30,6 +30,7 @@ Older saves upgrade automatically: commissions, history and settings are kept, a
 - **Chapter:** the random Concept roller unlocks in Chapter 2. In Chapter 1 you can still enter a concept the commission gives you.
 - **Practice / Testing mode:** try anything without touching your real playthrough. Finishing a practice commission just clears it; nothing is saved or marked used.
 - **Concept collection:** every concept with Available / Used, search, grouping, rename, add/remove and undo. A concept becomes Used only when a real commission with it is finished, and Used concepts are never rolled again. A concept the commission gives you always works.
+- Changes to the default concepts go in `conceptUpdates` in `js/data.js`. Each one is applied once to existing saves: exact-match renames keep Used status, removals leave past commissions alone, and missing defaults are added without touching custom concepts.
 - Concepts have stable IDs (e.g. `concept:botanical-sunflower`), so renaming one keeps its status. The original concept list from older saves is kept in `conceptPoolBackup`.
 
 ## Editing the other pools

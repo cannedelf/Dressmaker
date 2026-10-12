@@ -83,13 +83,38 @@
     // Pattern library: see js/patterns.js.
 
     concepts: [
-      'Food: Strawberry', 'Food: Lemon tart', 'Food: Blueberry', 'Food: Macaron', 'Food: Honeycomb',
-      'Animal: Bumblebee', 'Animal: Peacock', 'Animal: Fox', 'Animal: Jellyfish', 'Animal: Swan',
+      'Food: Strawberry', 'Food: Lemon tart', 'Food: Blueberry', 'Food: Macaron', 'Food: Honeycomb', 'Food: Cake',
+      'Animal: Bumblebee', 'Animal: Peacock', 'Animal: Fox', 'Animal: Jellyfish', 'Animal: Swan', 'Animal: Butterfly', 'Animal: Spider',
       'Botanical: Rose garden', 'Botanical: Wisteria', 'Botanical: Mushroom', 'Botanical: Sunflower', 'Botanical: Ivy',
       'Celestial: Starry night', 'Celestial: Sunrise', 'Celestial: Moon phases', 'Celestial: Comet',
       'Storybook: Fairy queen', 'Storybook: Little Red', 'Storybook: Mermaid', 'Storybook: Witch\'s apprentice',
-      'Object: Teacup', 'Object: Stained glass', 'Object: Music box', 'Object: Candle',
-      'Place: Seaside', 'Place: Autumn forest', 'Place: Carnival', 'Place: Snowy village',
+      'Storybook: Harlequin', 'Storybook: Knight',
+      'Object: Porcelain', 'Object: Stained glass', 'Object: Candle', 'Object: Clockwork', 'Object: Playing cards',
+      'Place: Seaside', 'Place: Autumn forest', 'Place: Carnival', 'Place: Snowy village', 'Place: Coral reef',
+      // Holidays roll all year round; there are no date restrictions.
+      'Holiday: Christmas', 'Holiday: Halloween', 'Holiday: Valentine\'s Day', 'Holiday: Easter',
+      // Broad design movements, not specific paintings.
+      'Artistic Style: Art Nouveau', 'Artistic Style: Art Deco',
+    ],
+
+    /*
+     * Changes to the default concepts, applied once to existing saves (see state.js).
+     * Only entries whose text still exactly matches are renamed or removed, so concepts
+     * a player has renamed themselves are left alone. Each update runs once, so a
+     * concept a player deletes afterwards isn't added back.
+     */
+    conceptUpdates: [
+      {
+        id: '2026-10-concept-pool',
+        rename: { 'Object: Teacup': 'Object: Porcelain' },
+        remove: ['Object: Music box'],
+        add: [
+          'Food: Cake', 'Animal: Butterfly', 'Animal: Spider', 'Storybook: Harlequin', 'Storybook: Knight',
+          'Object: Porcelain', 'Object: Clockwork', 'Object: Playing cards', 'Place: Coral reef',
+          'Holiday: Christmas', 'Holiday: Halloween', 'Holiday: Valentine\'s Day', 'Holiday: Easter',
+          'Artistic Style: Art Nouveau', 'Artistic Style: Art Deco',
+        ],
+      },
     ],
 
     rerollReasons: [
