@@ -184,7 +184,8 @@ test('12. v1 save migrates without losing commissions, settings or history', () 
   assert.strictEqual(s.enabled.colour, false);
   assert.strictEqual(s.colours.Red, false);
   assert.strictEqual(s.neutralsAllowed, false);
-  assert.deepStrictEqual(s.conceptPool, ['Food: Carrot']);
+  assert.deepStrictEqual(s.conceptPool.map((c) => c.text), ['Food: Carrot']);
+  assert.deepStrictEqual(s.conceptPoolBackup, ['Food: Carrot']);
   assert.strictEqual(s.past.length, 1);
   assert.strictEqual(s.log.length, 1);
   assert.strictEqual(s.slots[0].locked, true);

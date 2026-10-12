@@ -297,14 +297,30 @@
     return { result, notes };
   }
 
-  function rollConcept(pool) {
-    const clean = pool.map((s) => s.trim()).filter(Boolean);
-    if (!clean.length) return { error: 'The concept pool is empty. Add some concepts first.' };
-    return { concept: pick(clean) };
+  // pool = [{ id, text }], used = { [id]: {...} }. Used concepts are never drawn.
+  function eligibleConcepts(pool, used) {
+    return (pool || []).filter((c) => c.text && c.text.trim() && !(used && used[c.id]));
+  }
+
+  function rollConcept(pool, used) {
+    if (!(pool || []).length) return { error: 'The concept pool is empty. Add some concepts first.' };
+    const eligible = eligibleConcepts(pool, used);
+    if (!eligible.length) {
+      return { error: 'All concepts have been used! Mark some as Available in the Concept Collection to roll again.', allUsed: true };
+    }
+    return { concept: pick(eligible) };
+  }
+
+  // Exact match only (ignoring case/spacing), against the whole entry or the part after "Category:".
+  function matchConcept(pool, name) {
+    const norm = (x) => String(x).trim().replace(/\s+/g, ' ').toLowerCase();
+    const want = norm(name || '');
+    if (!want) return null;
+    return (pool || []).find((c) => norm(c.text) === want || norm(c.text.split(':').slice(1).join(':')) === want) || null;
   }
 
   const API = {
-    randInt, pick, eligibleCategories, rollCategory, rollSlot, rollConcept,
+    randInt, pick, eligibleCategories, rollCategory, rollSlot, rollConcept, eligibleConcepts, matchConcept,
     convertToRandom, unusedPatterns, unlockedPatterns, fabricPool, partLabel, isUnlocked, buildPatternPool,
   };
 

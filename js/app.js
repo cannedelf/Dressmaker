@@ -72,26 +72,31 @@
       save(); renderConcept(); renderSummary();
     });
     $('btn-concept').addEventListener('click', () => {
-      const out = R.rollConcept(state.conceptPool);
-      if (out.error) { $('concept-out').textContent = out.error; return; }
-      state.commission.rolledConcept = out.concept;
-      addLog({ action: 'Concept', result: out.concept });
+      if (!conceptRollAllowed()) return;
+      const out = R.rollConcept(state.conceptPool, state.usedConcepts);
+      if (out.error) { renderConcept(); return; }
+      state.commission.rolledConcept = out.concept.text;
+      state.commission.rolledConceptId = out.concept.id;
+      state.commission.rolledInPractice = state.practice;
+      addLog({ action: state.practice ? 'Concept (practice)' : 'Concept', result: out.concept.text });
       save(); renderConcept(); renderSummary(); renderLog();
     });
     $('btn-concept-clear').addEventListener('click', () => {
       state.commission.rolledConcept = '';
+      state.commission.rolledConceptId = null;
+      state.commission.rolledInPractice = false;
       save(); renderConcept(); renderSummary();
     });
-    $('concept-pool').addEventListener('change', (e) => {
-      state.conceptPool = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
-      save();
-    });
+  }
+
+  // Random concepts unlock in Chapter 2; Practice mode can try them any time.
+  function conceptRollAllowed() {
+    return state.practice || state.chapter >= 2;
   }
 
   function renderForm() {
     for (const [id, key] of Object.entries(fieldMap)) $(id).value = state.commission[key] || '';
     $('c-hasConcept').checked = !!state.commission.hasConcept;
-    $('concept-pool').value = state.conceptPool.join('\n');
     renderConcept();
   }
 
@@ -102,6 +107,42 @@
     $('concept-out').textContent = state.commission.rolledConcept || '';
     $('btn-concept').textContent = state.commission.rolledConcept ? 'Roll again' : 'Roll a concept';
     $('btn-concept-clear').hidden = !state.commission.rolledConcept;
+    const allowed = conceptRollAllowed();
+    $('btn-concept').disabled = !allowed;
+    $('concept-lock').hidden = allowed;
+    const left = R.eligibleConcepts(state.conceptPool, state.usedConcepts).length;
+    const total = state.conceptPool.length;
+    $('concept-msg').textContent = !allowed ? ''
+      : left ? `${left} of ${total} concepts available to roll.`
+        : total ? 'All concepts have been used! Mark some as Available in the Concept collection to roll again.'
+          : 'The concept pool is empty. Add some in the Concept collection.';
+  }
+
+  // ---------- Chapter & practice mode ----------
+
+  function renderProgress() {
+    $('chapter').value = state.chapter;
+    $('chapter-down').disabled = state.chapter <= 1;
+    $('practice').checked = state.practice;
+    document.body.classList.toggle('is-practice', state.practice);
+    $('practice-banner').hidden = !state.practice;
+    $('btn-finish').textContent = state.practice ? 'Finish practice (nothing is saved)' : 'Finish & start a new commission';
+  }
+
+  function setChapter(n) {
+    const v = Math.floor(Number(n));
+    state.chapter = Number.isFinite(v) && v >= 1 ? v : 1;
+    save(); renderProgress(); renderConcept();
+  }
+
+  function bindProgress() {
+    $('chapter-down').addEventListener('click', () => setChapter(state.chapter - 1));
+    $('chapter-up').addEventListener('click', () => setChapter(state.chapter + 1));
+    $('chapter').addEventListener('change', (e) => setChapter(e.target.value));
+    $('practice').addEventListener('change', (e) => {
+      state.practice = e.target.checked;
+      save(); renderProgress(); renderConcept(); renderSlots(); renderSummary();
+    });
   }
 
   // ---------- Category & colour toggles ----------
@@ -247,7 +288,7 @@
           extra = `<button class="btn secondary small" data-act="choose" data-slot="${i}">Choose pattern…</button>`;
         }
       }
-      if (r.choice) {
+      if (r.choice && !state.practice) {
         const used = progressOf(r.choice).used;
         extra += `<button class="btn secondary small" data-act="used" data-slot="${i}" aria-pressed="${used}">
           ${used ? '✅ Marked as used' : 'Mark pattern as used'}</button>`;
@@ -404,6 +445,7 @@
   function summaryText() {
     const c = state.commission;
     const lines = ['🌞 Crobat & Sunshine — Fashion Roulette'];
+    if (state.practice) lines.push('🧪 PRACTICE — not part of the real playthrough');
     if (c.customer) lines.push(`Customer: ${c.customer}`);
     if (c.brief) lines.push(`Brief: ${c.brief}`);
     if (c.requirements) lines.push(`Requirements: ${c.requirements}`);
@@ -455,25 +497,171 @@
     });
 
     $('btn-finish').addEventListener('click', () => {
+      if (state.practice) {
+        if (!confirm('Clear this practice commission?\n\nNothing is saved to your past commissions and no concepts or patterns are marked as used.\n\nTo keep it as a real commission instead, press Cancel, switch off Practice mode, then Finish.')) return;
+        resetCommission();
+        showNotice('Practice cleared. 🧪');
+        return;
+      }
       const pending = state.slots.some((s) => s.current && s.current.mode === 'unused' && !s.current.choice);
       const msg = pending
         ? 'One slot still needs a pattern chosen. Finish anyway?'
         : 'Save this commission to your past commissions and start a new one?\n\n(Patterns are only marked used if you pressed "Mark pattern as used".)';
       if (!confirm(msg)) return;
+      const markedConcept = markFinishedConcept(state.commission);
       state.past.unshift({
         finishedAt: new Date().toISOString(),
         commission: state.commission,
         results: state.slots.map((s) => s.current),
         log: state.log,
         summary: summaryText(),
+        conceptMarkedUsed: markedConcept,
       });
-      state.commission = blankCommission();
-      state.slots = blankSlots();
-      state.log = [];
-      save();
-      renderAll();
-      showNotice('Saved! Ready for the next commission. 🌞');
+      resetCommission();
+      showNotice(markedConcept
+        ? `Saved! “${conceptText(markedConcept)}” is now marked as used. Ready for the next commission. 🌞`
+        : 'Saved! Ready for the next commission. 🌞');
       window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+    });
+  }
+
+  function resetCommission() {
+    state.commission = blankCommission();
+    state.slots = blankSlots();
+    state.log = [];
+    save();
+    renderAll();
+  }
+
+  function conceptText(id) {
+    const c = state.conceptPool.find((x) => x.id === id);
+    return c ? c.text : id;
+  }
+
+  /*
+   * A finished real commission uses up its concept:
+   * - a rolled concept is marked used (after a confirm if it was rolled in Practice mode);
+   * - a commission-supplied concept is only marked if it exactly matches a pool entry and you agree.
+   * Returns the concept ID that was marked, or null.
+   */
+  function markFinishedConcept(c) {
+    let id = null;
+    if (c.hasConcept) {
+      const match = R.matchConcept(state.conceptPool, c.conceptName);
+      if (match && !state.usedConcepts[match.id]
+        && confirm(`This commission's concept “${c.conceptName}” matches “${match.text}” in your Concept collection.\n\nMark it as used so it won't be rolled again?`)) {
+        id = match.id;
+      }
+    } else if (c.rolledConcept) {
+      const entry = state.conceptPool.find((x) => x.id === c.rolledConceptId)
+        || state.conceptPool.find((x) => x.text === c.rolledConcept);
+      if (entry && !state.usedConcepts[entry.id]
+        && (!c.rolledInPractice || confirm(`“${entry.text}” was rolled in Practice mode.\n\nCount it as used in your real playthrough?`))) {
+        id = entry.id;
+      }
+    }
+    if (id) state.usedConcepts[id] = { usedAt: new Date().toISOString(), by: c.customer || '' };
+    return id;
+  }
+
+  // ---------- Concept collection ----------
+
+  let conceptUndo = null;
+
+  function conceptGroup(text) {
+    const i = text.indexOf(':');
+    return i > 0 ? text.slice(0, i).trim() : 'Other';
+  }
+
+  function renderConcepts() {
+    const q = $('cc-search').value.trim().toLowerCase();
+    const filter = $('cc-filter').value;
+    const used = state.usedConcepts;
+    const total = state.conceptPool.length;
+    const nUsed = state.conceptPool.filter((c) => used[c.id]).length;
+    $('cc-counts').textContent = `${total - nUsed} available · ${nUsed} used · ${total} total`;
+
+    const rows = state.conceptPool.filter((c) => {
+      if (q && !c.text.toLowerCase().includes(q)) return false;
+      if (filter === 'available') return !used[c.id];
+      if (filter === 'used') return !!used[c.id];
+      return true;
+    });
+    const groups = new Map();
+    for (const c of rows) {
+      const g = conceptGroup(c.text);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(c);
+    }
+    $('cc-list').innerHTML = groups.size ? [...groups].map(([g, list]) => `
+      <h3>${esc(g)}</h3>
+      <ul class="cc-group">${list.map((c) => {
+        const u = used[c.id];
+        const when = u && u.usedAt && !Number.isNaN(Date.parse(u.usedAt)) ? new Date(u.usedAt).toLocaleDateString() : '';
+        return `<li class="cc-row${u ? ' is-used' : ''}">
+          <input type="text" value="${esc(c.text)}" data-cid="${esc(c.id)}" aria-label="Concept name" autocomplete="off">
+          <span class="status ${u ? 'off' : 'on'}">${u ? `Used${u.by ? ` · ${esc(u.by)}` : ''}${when ? ` · ${esc(when)}` : ''}` : 'Available'}</span>
+          <button class="btn secondary small" type="button" data-toggle="${esc(c.id)}">${u ? 'Mark available' : 'Mark used'}</button>
+          <button class="btn link small" type="button" data-remove="${esc(c.id)}" aria-label="Remove ${esc(c.text)}">✕</button>
+        </li>`;
+      }).join('')}</ul>`).join('') : '<p class="hint">No concepts match.</p>';
+  }
+
+  function renderUndo(msg) {
+    $('cc-undo').innerHTML = msg
+      ? `${esc(msg)} <button class="btn link small" type="button" id="cc-undo-btn">Undo</button>`
+      : '';
+  }
+
+  function bindConcepts() {
+    $('cc-search').addEventListener('input', renderConcepts);
+    $('cc-filter').addEventListener('change', renderConcepts);
+    $('cc-undo').addEventListener('click', (e) => {
+      if (e.target.id !== 'cc-undo-btn' || !conceptUndo) return;
+      if (conceptUndo.prev) state.usedConcepts[conceptUndo.id] = conceptUndo.prev;
+      else delete state.usedConcepts[conceptUndo.id];
+      conceptUndo = null;
+      renderUndo('');
+      save(); renderConcepts(); renderConcept();
+    });
+    $('cc-list').addEventListener('click', (e) => {
+      const toggle = e.target.closest('button[data-toggle]');
+      if (toggle) {
+        const id = toggle.dataset.toggle;
+        const prev = state.usedConcepts[id] || null;
+        if (prev) delete state.usedConcepts[id];
+        else state.usedConcepts[id] = { usedAt: new Date().toISOString(), by: '' };
+        conceptUndo = { id, prev };
+        renderUndo(`“${conceptText(id)}” marked ${prev ? 'available' : 'used'}.`);
+        save(); renderConcepts(); renderConcept();
+        return;
+      }
+      const remove = e.target.closest('button[data-remove]');
+      if (remove && confirm(`Remove “${conceptText(remove.dataset.remove)}” from the pool?\n\nPast commissions keep their concept.`)) {
+        state.conceptPool = state.conceptPool.filter((c) => c.id !== remove.dataset.remove);
+        save(); renderConcepts(); renderConcept();
+      }
+    });
+    // Renaming keeps the concept's ID, so its Used status stays with it.
+    $('cc-list').addEventListener('change', (e) => {
+      const el = e.target;
+      if (!el.dataset.cid) return;
+      const c = state.conceptPool.find((x) => x.id === el.dataset.cid);
+      const text = el.value.trim();
+      if (!c) return;
+      if (!text) { el.value = c.text; return; }
+      c.text = text;
+      save(); renderConcepts();
+    });
+    $('cc-add').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = e.target.elements.text;
+      const text = input.value.trim();
+      if (!text) return;
+      const taken = new Set(state.conceptPool.map((c) => c.id).concat(Object.keys(state.usedConcepts)));
+      state.conceptPool.push({ id: S.newConceptId(text, taken), text });
+      input.value = '';
+      save(); renderConcepts(); renderConcept();
     });
   }
 
@@ -707,6 +895,7 @@
   // ---------- Boot ----------
 
   function renderAll() {
+    renderProgress();
     renderForm();
     renderToggles();
     renderSlots();
@@ -714,11 +903,13 @@
     renderLog();
     renderFriends();
     renderLibrary();
+    renderConcepts();
     renderPast();
     renderNoticeForPools();
   }
 
   $('btn-spin').addEventListener('click', spinBoth);
+  bindProgress();
   bindForm();
   bindToggles();
   bindSlots();
@@ -728,6 +919,7 @@
   bindPast();
   bindFriends();
   bindLibrary();
+  bindConcepts();
   bindData();
   renderAll();
 })();

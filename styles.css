@@ -17,6 +17,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
 
@@ -269,3 +270,43 @@ footer { text-align: center; color: var(--plum-soft); padding: 8px 16px 32px; fo
 @media (max-width: 560px) {
   .lib-row { grid-template-columns: 1fr auto auto; grid-template-areas: "main main main" "status used ." "more more more"; }
 }
+
+/* Playthrough progress & practice mode */
+.progress { padding: 12px 16px; }
+.progress-row { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.chapter { display: flex; align-items: center; gap: 10px; }
+.chapter label { margin: 0; }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper .btn { min-width: 40px; padding: 4px 0; font-size: 1.1rem; }
+.chapter input[type="number"] {
+  width: 3.4em; text-align: center; font: inherit; font-weight: 800; color: var(--plum);
+  border: 2px solid var(--line); border-radius: 10px; padding: 5px 2px; background: #fff;
+}
+.practice-toggle { margin: 0; }
+.practice-toggle small { font-weight: 600; color: var(--plum-soft); }
+.practice-banner {
+  background: var(--bat); color: #fff; border-radius: 14px; padding: 10px 14px; margin: -4px 0 16px;
+  font-weight: 600;
+}
+body.is-practice {
+  background: repeating-linear-gradient(135deg, var(--peach) 0 22px, #f3e3f4 22px 44px);
+}
+body.is-practice .card { border-color: #c9a9e0; box-shadow: 0 3px 0 #c9a9e0; }
+.lock-note { background: var(--butter-soft); border: 2px dashed var(--butter-deep); border-radius: 12px; padding: 8px 12px; margin: 6px 0; font-weight: 600; }
+
+/* Concept collection */
+.cc-group { list-style: none; padding: 0; margin: 0 0 8px; }
+.cc-row {
+  display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px 10px; align-items: center;
+  border-bottom: 1px solid var(--line); padding: 6px 0;
+}
+.cc-row input[type="text"] { margin: 0; padding: 6px 9px; }
+.cc-row.is-used input[type="text"] { color: var(--plum-soft); text-decoration: line-through; }
+.cc-row .status { grid-area: auto; font-size: .85rem; }
+@media (max-width: 560px) {
+  .cc-row { grid-template-columns: 1fr auto auto; }
+  .cc-row input[type="text"] { grid-column: 1 / -1; }
+}
+.cc-add { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.cc-add label { flex: 1 1 220px; margin: 0; }
+#cc-undo:not(:empty) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }

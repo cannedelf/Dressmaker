@@ -6,6 +6,9 @@
  *   2 — wiki pattern library: `friendships`, `patternProgress`, `includeNone`.
  *       The v1 catalogue is kept untouched in `legacyPatterns` (not mapped, since
  *       its IDs don't follow the wiki's order).
+ *   3 — concept progression: `conceptPool` becomes [{ id, text }] with stable IDs,
+ *       `usedConcepts`, `chapter`, `practice`. The v2 string list is kept untouched
+ *       in `conceptPoolBackup`. Nothing is marked used by the migration.
  */
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -13,18 +16,50 @@
   const P = isNode ? require('./patterns.js') : root.FR_PATTERNS;
 
   const STORAGE_KEY = 'crobat-sunshine-fashion-roulette-v1';
-  const SCHEMA_VERSION = 2;
+  const SCHEMA_VERSION = 3;
   const OVERRIDES = ['auto', 'unlocked', 'locked'];
+
+  const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
 
   function blankCommission() {
     return {
       customer: '', brief: '', requirements: '', forbidden: '', fabrics: '', budget: '',
-      hasConcept: false, conceptName: '', rolledConcept: '', outcome: '', notes: '',
+      hasConcept: false, conceptName: '', rolledConcept: '', rolledConceptId: null, rolledInPractice: false,
+      outcome: '', notes: '',
     };
   }
 
   function blankSlots() {
     return [{ current: null, locked: false, attempts: 0 }, { current: null, locked: false, attempts: 0 }];
+  }
+
+  function slug(text) {
+    return String(text).toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'concept';
+  }
+
+  // Give each concept a stable ID based on its original wording. Renaming later keeps the ID.
+  function newConceptId(text, taken) {
+    const base = `concept:${slug(text)}`;
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+    taken.add(id);
+    return id;
+  }
+
+  function toConceptItems(list) {
+    const taken = new Set();
+    const items = [];
+    for (const entry of list) {
+      if (typeof entry === 'string') {
+        const text = entry.trim();
+        if (text) items.push({ id: newConceptId(text, taken), text });
+      } else if (isObj(entry) && typeof entry.text === 'string' && entry.text.trim()) {
+        const id = typeof entry.id === 'string' && entry.id && !taken.has(entry.id) ? entry.id : newConceptId(entry.text, taken);
+        taken.add(id);
+        items.push({ id, text: entry.text.trim() });
+      }
+    }
+    return items;
   }
 
   function defaultFriendships() {
@@ -41,7 +76,10 @@
       friendships: defaultFriendships(),
       patternProgress: {},
       includeNone: false,
-      conceptPool: D.concepts.slice(),
+      conceptPool: toConceptItems(D.concepts),
+      usedConcepts: {},
+      chapter: 1,
+      practice: false,
       slots: blankSlots(),
       log: [],
       past: [],
@@ -52,8 +90,6 @@
     const v = Math.round(Number(n));
     return Number.isFinite(v) ? Math.min(P.MAX_STARS, Math.max(0, v)) : 0;
   }
-
-  const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
 
   // Fill in anything missing and migrate older saves. Never drops commissions or settings.
   function normalise(raw) {
@@ -69,7 +105,28 @@
     if (!Array.isArray(s.slots) || s.slots.length !== 2) s.slots = blankSlots();
     if (!Array.isArray(s.log)) s.log = [];
     if (!Array.isArray(s.past)) s.past = [];
-    if (!Array.isArray(s.conceptPool)) s.conceptPool = D.concepts.slice();
+
+    // v2 → v3: plain concept strings become { id, text }; keep the original list as a backup.
+    if (Array.isArray(src.conceptPool)) {
+      if (src.conceptPool.some((x) => typeof x === 'string') && !Array.isArray(src.conceptPoolBackup)) {
+        s.conceptPoolBackup = src.conceptPool.slice();
+      }
+      s.conceptPool = toConceptItems(src.conceptPool);
+    } else {
+      s.conceptPool = toConceptItems(D.concepts);
+    }
+    s.usedConcepts = {};
+    for (const [id, u] of Object.entries(isObj(src.usedConcepts) ? src.usedConcepts : {})) {
+      if (isObj(u)) s.usedConcepts[id] = { usedAt: u.usedAt || null, by: typeof u.by === 'string' ? u.by : '' };
+    }
+    const chapter = Math.floor(Number(src.chapter));
+    s.chapter = Number.isFinite(chapter) && chapter >= 1 ? chapter : 1;
+    s.practice = !!src.practice;
+    // A concept rolled before IDs existed: link it to its pool entry by exact text.
+    if (s.commission.rolledConcept && !s.commission.rolledConceptId) {
+      const match = s.conceptPool.find((c) => c.text === s.commission.rolledConcept);
+      s.commission.rolledConceptId = match ? match.id : null;
+    }
 
     // v1 → v2: keep the home-made catalogue as-is rather than guessing a mapping.
     if (src.patterns && !src.legacyPatterns) s.legacyPatterns = src.patterns;
@@ -103,7 +160,7 @@
 
   const API = {
     STORAGE_KEY, SCHEMA_VERSION, OVERRIDES,
-    blankCommission, blankSlots, defaultFriendships, defaultState, normalise, clampStars,
+    blankCommission, blankSlots, defaultFriendships, defaultState, normalise, clampStars, toConceptItems, newConceptId,
   };
 
   if (isNode) module.exports = API;

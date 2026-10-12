@@ -36,6 +36,28 @@
   </header>
 
   <main>
+    <!-- Playthrough progress -->
+    <section class="card progress" aria-labelledby="h-progress">
+      <h2 id="h-progress" class="sr">Playthrough progress</h2>
+      <div class="progress-row">
+        <div class="chapter">
+          <label for="chapter">Chapter</label>
+          <span class="stepper">
+            <button id="chapter-down" class="btn secondary small" type="button" aria-label="Previous chapter">−</button>
+            <input id="chapter" type="number" inputmode="numeric" min="1" step="1">
+            <button id="chapter-up" class="btn secondary small" type="button" aria-label="Next chapter">+</button>
+          </span>
+        </div>
+        <label class="check practice-toggle">
+          <input id="practice" type="checkbox">
+          <span><strong>Practice / Testing mode</strong><br><small>Try things out without touching your real playthrough.</small></span>
+        </label>
+      </div>
+    </section>
+    <div id="practice-banner" class="practice-banner" role="status" hidden>
+      🧪 <strong>Practice mode.</strong> Nothing here marks concepts or patterns as used, and finishing won't save to your records.
+    </div>
+
     <!-- 1. Commission -->
     <section class="card" aria-labelledby="h-commission">
       <h2 id="h-commission"><span aria-hidden="true">📝</span> 1. Commission</h2>
@@ -78,17 +100,13 @@
       </div>
       <div id="concept-roll">
         <p class="hint">Optional. Rolling a concept doesn't use up either main spin.</p>
+        <p id="concept-lock" class="lock-note" hidden>🔒 Concept Roulette unlocks in Chapter 2. You can still tick “Commission already has a concept” above, or switch on Practice mode to try it out.</p>
         <div class="row">
           <button id="btn-concept" class="btn secondary" type="button">Roll a concept</button>
           <output id="concept-out" class="concept-out" aria-live="polite"></output>
           <button id="btn-concept-clear" class="btn link" type="button">Clear</button>
         </div>
-        <details>
-          <summary>Edit concept pool</summary>
-          <label>One concept per line
-            <textarea id="concept-pool" rows="8"></textarea>
-          </label>
-        </details>
+        <p id="concept-msg" class="hint" role="status" aria-live="polite"></p>
       </div>
     </section>
 
@@ -182,6 +200,35 @@
           <input id="include-none" type="checkbox">
           <span>Let Pattern Piece rolls pick <em>No Sleeves</em> / <em>No Collar</em> (off by default, since the challenge needs a real piece)</span>
         </label>
+      </details>
+    </section>
+
+    <!-- Concept collection -->
+    <section class="card" aria-labelledby="h-concepts">
+      <details id="concepts-details">
+        <summary><h2 id="h-concepts"><span aria-hidden="true">🌟</span> Concept collection</h2></summary>
+        <p class="hint">A concept becomes <strong>Used</strong> when a real commission with it is finished, and then it won't be rolled again. Rolling, rerolling or practising never uses one up. A concept the commission gives you always works, even if it's marked used here.</p>
+        <div class="grid2">
+          <label>Search
+            <input id="cc-search" type="search" autocomplete="off" placeholder="e.g. Sunflower">
+          </label>
+          <label>Show
+            <select id="cc-filter">
+              <option value="all">All</option>
+              <option value="available">Available</option>
+              <option value="used">Used</option>
+            </select>
+          </label>
+        </div>
+        <p id="cc-counts" class="hint"></p>
+        <div id="cc-undo" class="news" role="status" aria-live="polite"></div>
+        <div id="cc-list"></div>
+        <form id="cc-add" class="cc-add">
+          <label>Add a concept
+            <input name="text" type="text" autocomplete="off" placeholder="e.g. Food: Carrot">
+          </label>
+          <button class="btn secondary small" type="submit">Add</button>
+        </form>
       </details>
     </section>
 
