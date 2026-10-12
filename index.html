@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fashion Roulette</title>
+  <meta name="description" content="Crobat & Sunshine's Fashion Roulette — two random creative challenges for a Dressmaker commission.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#roulette">Skip to roulette</a>
+
+  <header class="hero">
+    <svg class="sun" viewBox="0 0 120 120" aria-hidden="true">
+      <g class="rays" stroke="var(--butter-deep)" stroke-width="7" stroke-linecap="round">
+        <line x1="60" y1="6" x2="60" y2="20"/><line x1="60" y1="100" x2="60" y2="114"/>
+        <line x1="6" y1="60" x2="20" y2="60"/><line x1="100" y1="60" x2="114" y2="60"/>
+        <line x1="22" y1="22" x2="32" y2="32"/><line x1="88" y1="88" x2="98" y2="98"/>
+        <line x1="22" y1="98" x2="32" y2="88"/><line x1="88" y1="32" x2="98" y2="22"/>
+      </g>
+      <circle cx="60" cy="60" r="34" fill="var(--butter)" stroke="var(--butter-deep)" stroke-width="4"/>
+      <circle cx="49" cy="55" r="4" fill="var(--plum)"/><circle cx="71" cy="55" r="4" fill="var(--plum)"/>
+      <circle cx="42" cy="66" r="5" fill="var(--strawberry)" opacity=".45"/><circle cx="78" cy="66" r="5" fill="var(--strawberry)" opacity=".45"/>
+      <path d="M48 68 Q60 80 72 68" fill="none" stroke="var(--plum)" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <p class="eyebrow">Crobat &amp; Sunshine</p>
+      <h1>Fashion Roulette</h1>
+      <p class="tagline">Real randomness. Commission first. Pink to ray. 🌞</p>
+    </div>
+    <svg class="bat" viewBox="0 0 120 70" aria-hidden="true">
+      <path d="M60 22 C50 6 30 2 6 10 C18 18 20 28 16 40 C28 32 40 34 48 44 C52 36 56 34 60 34 C64 34 68 36 72 44 C80 34 92 32 104 40 C100 28 102 18 114 10 C90 2 70 6 60 22Z" fill="var(--bat)"/>
+      <path d="M44 46 C40 54 32 58 22 58 C32 62 42 62 50 54Z M76 46 C80 54 88 58 98 58 C88 62 78 62 70 54Z" fill="var(--bat)" opacity=".7"/>
+      <circle cx="54" cy="28" r="3" fill="var(--butter)"/><circle cx="66" cy="28" r="3" fill="var(--butter)"/>
+    </svg>
+  </header>
+
+  <main>
+    <!-- 1. Commission -->
+    <section class="card" aria-labelledby="h-commission">
+      <h2 id="h-commission"><span aria-hidden="true">📝</span> 1. Commission</h2>
+      <p class="hint">These are notes for you. The app doesn't check them automatically.</p>
+      <div class="grid2">
+        <label>Customer
+          <input id="c-customer" type="text" autocomplete="off" placeholder="e.g. Edith">
+        </label>
+        <label>Budget
+          <input id="c-budget" type="text" autocomplete="off" placeholder="e.g. 300">
+        </label>
+      </div>
+      <label>What they asked for
+        <textarea id="c-brief" rows="2" placeholder="Paste or type the commission text"></textarea>
+      </label>
+      <div class="grid2">
+        <label>Targets / requirements
+          <input id="c-requirements" type="text" autocomplete="off" placeholder="e.g. Quality 80+">
+        </label>
+        <label>Forbidden colours
+          <input id="c-forbidden" type="text" autocomplete="off" placeholder="e.g. anything not orange/yellow/green">
+        </label>
+      </div>
+      <label>Required fabrics or percentages
+        <input id="c-fabrics" type="text" autocomplete="off" placeholder="e.g. 50% cotton">
+      </label>
+    </section>
+
+    <!-- 2. Concept -->
+    <section class="card" aria-labelledby="h-concept">
+      <h2 id="h-concept"><span aria-hidden="true">💡</span> 2. Concept</h2>
+      <label class="check">
+        <input id="c-hasConcept" type="checkbox">
+        <span>Commission already has a concept</span>
+      </label>
+      <div id="concept-given">
+        <label>Concept name
+          <input id="c-conceptName" type="text" autocomplete="off" placeholder="e.g. Carrot">
+        </label>
+      </div>
+      <div id="concept-roll">
+        <p class="hint">Optional. Rolling a concept doesn't use up either main spin.</p>
+        <div class="row">
+          <button id="btn-concept" class="btn secondary" type="button">Roll a concept</button>
+          <output id="concept-out" class="concept-out" aria-live="polite"></output>
+          <button id="btn-concept-clear" class="btn link" type="button">Clear</button>
+        </div>
+        <details>
+          <summary>Edit concept pool</summary>
+          <label>One concept per line
+            <textarea id="concept-pool" rows="8"></textarea>
+          </label>
+        </details>
+      </div>
+    </section>
+
+    <!-- 3. Categories -->
+    <section class="card" aria-labelledby="h-cats">
+      <h2 id="h-cats"><span aria-hidden="true">🎛️</span> 3. Eligible categories</h2>
+      <p class="hint">Turn off anything the commission already controls. For example, switch Colour off for a commission that only allows orange, yellow and green.</p>
+      <div id="cat-toggles" class="toggles"></div>
+      <details>
+        <summary>Which colours can be rolled?</summary>
+        <div id="colour-toggles" class="chips"></div>
+        <label class="check">
+          <input id="neutrals" type="checkbox">
+          <span>Allow neutrals (white, cream, black, brown, grey) as supporting colours</span>
+        </label>
+      </details>
+    </section>
+
+    <!-- 4. Roulette -->
+    <section class="card roulette" id="roulette" aria-labelledby="h-roulette" tabindex="-1">
+      <h2 id="h-roulette"><span aria-hidden="true">🎡</span> 4. Spin!</h2>
+      <button id="btn-spin" class="btn primary big" type="button">Spin both</button>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <div class="slots" aria-live="polite">
+        <article class="slot" id="slot-0"></article>
+        <article class="slot" id="slot-1"></article>
+      </div>
+    </section>
+
+    <!-- 5. Summary -->
+    <section class="card" aria-labelledby="h-summary">
+      <h2 id="h-summary"><span aria-hidden="true">👗</span> 5. Make the dress</h2>
+      <label for="summary">Summary</label>
+      <textarea id="summary" rows="9" readonly></textarea>
+      <div class="row">
+        <button id="btn-copy" class="btn secondary" type="button">Copy summary</button>
+        <span id="copy-status" class="hint" aria-live="polite"></span>
+      </div>
+      <div class="grid2">
+        <label>Outcome
+          <select id="c-outcome">
+            <option value="">Not made yet</option>
+            <option value="success">Succeeded 🎉</option>
+            <option value="partial">Partly</option>
+            <option value="fail">Didn't work out</option>
+          </select>
+        </label>
+        <label>Notes
+          <input id="c-notes" type="text" autocomplete="off" placeholder="Anything to remember">
+        </label>
+      </div>
+      <h3>Roll history</h3>
+      <ol id="log" class="log"></ol>
+      <button id="btn-finish" class="btn primary" type="button">Finish &amp; start a new commission</button>
+      <p class="hint">Finishing saves this commission to your past commissions and marks any patterns you used as used.</p>
+    </section>
+
+    <!-- Patterns -->
+    <section class="card" aria-labelledby="h-patterns">
+      <details id="patterns-details">
+        <summary><h2 id="h-patterns"><span aria-hidden="true">📐</span> Pattern catalogue</h2></summary>
+        <p class="hint">These IDs are our own index labels, not official in-game IDs. Tick what you've unlocked and what you've already used.</p>
+        <label>Search
+          <input id="pattern-search" type="search" placeholder="e.g. BO03 or puff">
+        </label>
+        <div id="pattern-tables"></div>
+      </details>
+    </section>
+
+    <!-- Past commissions -->
+    <section class="card" aria-labelledby="h-past">
+      <details>
+        <summary><h2 id="h-past"><span aria-hidden="true">📚</span> Past commissions</h2></summary>
+        <div id="past"></div>
+      </details>
+    </section>
+
+    <!-- Rules -->
+    <section class="card" aria-labelledby="h-rules">
+      <details>
+        <summary><h2 id="h-rules"><span aria-hidden="true">📜</span> House rules</h2></summary>
+        <ul class="rules">
+          <li><strong>Two main spins.</strong> Each spin picks a category first, then rolls the details inside that category. The detail rolls don't use up a spin.</li>
+          <li><strong>Same category twice is fine.</strong> Two Accessory results can happen. The exact same finished challenge in both slots is redrawn automatically.</li>
+          <li><strong>The commission comes first.</strong> If the roulette conflicts with what the customer asked for, the customer wins. Reroll that slot and say why.</li>
+          <li><strong>Valid reroll reasons:</strong> exact duplicate, conflicts with the commission, not unlocked or incompatible, or another genuinely impossible situation (add a note). "I don't like how it looks" isn't a valid reason.</li>
+          <li><strong>Accessories:</strong> at least 3 pieces, arranged on purpose. Lace trim and trim (including piping) count as 3 distinct decorated areas.</li>
+          <li><strong>Fabric:</strong> it must have a meaningful visible presence. Burlap is never rolled.</li>
+          <li><strong>Pattern Piece:</strong> a Random Pattern is binding unless it's impossible. With Choose Unused, you pick any unlocked pattern you've never used.</li>
+          <li><strong>The app doesn't check</strong> Quality, Gothic, Risqué, percentages, prices or compatibility. Check those yourself in the game.</li>
+        </ul>
+      </details>
+    </section>
+
+    <!-- Data -->
+    <section class="card" aria-labelledby="h-data">
+      <details>
+        <summary><h2 id="h-data"><span aria-hidden="true">💾</span> Save data</h2></summary>
+        <p class="hint">Everything is saved automatically, but only in <strong>this browser on this device</strong>. It isn't synced anywhere. Export a backup to move it to another device.</p>
+        <div class="row">
+          <button id="btn-export" class="btn secondary" type="button">Export JSON</button>
+          <label class="btn secondary file">Import JSON
+            <input id="file-import" type="file" accept="application/json,.json">
+          </label>
+          <button id="btn-reset" class="btn danger" type="button">Reset everything</button>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer>Made for a second playthrough of <em>Dressmaker</em>. 🦇 + 🌞</footer>
+
+  <!-- Reroll reason dialog -->
+  <dialog id="dlg-reroll" aria-labelledby="dlg-reroll-title">
+    <form method="dialog" id="form-reroll">
+      <h2 id="dlg-reroll-title">Reroll slot <span id="reroll-slot-num"></span></h2>
+      <p class="hint">Only reroll if the result is impossible or conflicts with the commission. Not liking how it looks doesn't count.</p>
+      <fieldset>
+        <legend>Reason</legend>
+        <div id="reroll-reasons"></div>
+      </fieldset>
+      <label>Note <span id="note-required" class="hint">(required for "Other")</span>
+        <input id="reroll-note" type="text" autocomplete="off">
+      </label>
+      <p id="reroll-error" class="error" role="alert"></p>
+      <div class="row end">
+        <button class="btn link" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn primary" id="btn-reroll-confirm" value="ok">Reroll</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Pattern choice dialog -->
+  <dialog id="dlg-pattern" aria-labelledby="dlg-pattern-title">
+    <form method="dialog">
+      <h2 id="dlg-pattern-title">Choose an unused pattern</h2>
+      <label>Search
+        <input id="choose-search" type="search" autocomplete="off">
+      </label>
+      <ul id="choose-list" class="choose-list"></ul>
+      <div class="row end">
+        <button class="btn link" value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/data.js"></script>
+  <script src="js/roulette.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
