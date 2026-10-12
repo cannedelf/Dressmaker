@@ -27,7 +27,7 @@ Older saves upgrade automatically: commissions, history and settings are kept, a
 
 ## Editing the other pools
 
-Colours, colour uses, fabrics, print challenges, accessories, trim/detail challenges, concepts and reroll reasons are in `js/data.js`. The colour list is still a placeholder to check against the wiki.
+Colours, colour uses, fabrics, print challenges, accessories, trim/detail challenges, concepts and reroll reasons are in `js/data.js`. Colours are the 11 wiki fabric colour categories: Blue, Green, Pink, Purple, Red, Yellow, Orange, Black, White, Grey, Brown.
 
 ## Tests
 

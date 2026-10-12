@@ -138,7 +138,7 @@
       const c = pick(pool);
       const c2 = use.needsSecond ? pick(pool.filter((x) => x !== c)) : null;
       const neutrals = ctx.neutralsAllowed
-        ? 'Neutrals (white, cream, black, brown, grey) may support — only if the commission and this rule allow.'
+        ? 'Neutrals (black, white, grey, brown) may support — only if the commission and this rule allow.'
         : 'No supporting neutrals this session.';
       return makeResult('colour', {
         subtype: use.label,

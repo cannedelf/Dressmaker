@@ -1,8 +1,7 @@
 /*
  * Fashion Roulette — starting pools.
  *
- * Everything here is meant to be edited by hand. Lists marked "PLACEHOLDER"
- * still need checking against the Dressmaker Wiki / our Google Sheet.
+ * Everything here is meant to be edited by hand.
  */
 (function (root) {
   const DATA = {
@@ -14,20 +13,19 @@
       { id: 'pattern', label: 'Pattern Piece', icon: '📐' },
     ],
 
-    // PLACEHOLDER: confirm the exact wiki colour category labels.
+    // The 11 fabric colour categories from https://dressmakerwiki.com/fabrics.
+    // Shades like teal, cream or navy are fabrics within these, not categories of their own.
     colours: [
-      { name: 'Red' },
-      { name: 'Orange' },
-      { name: 'Yellow' },
-      { name: 'Green' },
-      { name: 'Teal' },
       { name: 'Blue' },
-      { name: 'Purple' },
+      { name: 'Green' },
       { name: 'Pink' },
-      { name: 'White', neutral: true },
-      { name: 'Cream', neutral: true },
-      { name: 'Grey', neutral: true },
+      { name: 'Purple' },
+      { name: 'Red' },
+      { name: 'Yellow' },
+      { name: 'Orange' },
       { name: 'Black', neutral: true },
+      { name: 'White', neutral: true },
+      { name: 'Grey', neutral: true },
       { name: 'Brown', neutral: true },
     ],
 

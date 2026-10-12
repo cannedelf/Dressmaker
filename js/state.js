@@ -61,7 +61,11 @@
     const s = Object.assign(defaultState(), src);
     s.commission = Object.assign(blankCommission(), src.commission);
     s.enabled = Object.assign(defaultState().enabled, src.enabled);
-    s.colours = Object.assign(defaultState().colours, src.colours);
+    // Only the official colour categories; drops old ones like Teal or Cream from earlier saves.
+    s.colours = defaultState().colours;
+    for (const name of Object.keys(s.colours)) {
+      if (isObj(src.colours) && name in src.colours) s.colours[name] = !!src.colours[name];
+    }
     if (!Array.isArray(s.slots) || s.slots.length !== 2) s.slots = blankSlots();
     if (!Array.isArray(s.log)) s.log = [];
     if (!Array.isArray(s.past)) s.past = [];
