@@ -5,11 +5,14 @@
  *   enabled: { colour: true, ... },        // category toggles
  *   colours: ['Red', ...],                 // eligible colour names
  *   neutralsAllowed: true,
- *   patterns: { BO: [{ id, name, unlocked, used }], ... },
+ *   patternPool: [{ id, part, name, unlocked, used, none }],  // from buildPatternPool
+ *   includeNone: false,                    // allow No Sleeves / No Collar in pattern rolls
  * }
  */
 (function (root) {
-  const D = (typeof module !== 'undefined' && module.exports) ? require('./data.js') : root.FR_DATA;
+  const isNode = typeof module !== 'undefined' && module.exports;
+  const D = isNode ? require('./data.js') : root.FR_DATA;
+  const P = isNode ? require('./patterns.js') : root.FR_PATTERNS;
   const cryptoApi = root.crypto || (typeof require !== 'undefined' ? require('crypto').webcrypto : null);
 
   const COMMISSION_FIRST = 'Commission restrictions override the roulette.';
@@ -45,20 +48,42 @@
     return D.fabricTypes.filter((f) => f.toLowerCase() !== 'burlap');
   }
 
-  function pieceLabel(code) {
-    return D.patternPieces.find((p) => p.code === code).label;
+  function partLabel(part) {
+    const p = P.PARTS.find((x) => x.part === part);
+    return p ? p.label : part;
   }
 
-  function unlockedPatterns(ctx, code) {
-    return ((ctx.patterns && ctx.patterns[code]) || []).filter((p) => p.unlocked);
+  /*
+   * Effective unlock: a manual override wins, otherwise starting patterns are
+   * unlocked and friendship patterns unlock at their client's star threshold.
+   * progress = { [patternId]: { used, unlockOverride: 'auto' | 'unlocked' | 'locked', notes } }
+   */
+  function isUnlocked(pattern, friendships, progress) {
+    const override = (progress && progress[pattern.id] && progress[pattern.id].unlockOverride) || 'auto';
+    if (override === 'unlocked') return true;
+    if (override === 'locked') return false;
+    return pattern.unlock.kind === 'start'
+      || ((friendships && friendships[pattern.unlock.client]) || 0) >= pattern.unlock.stars;
   }
 
-  function unusedPatterns(ctx, code) {
-    return unlockedPatterns(ctx, code).filter((p) => !p.used);
+  function buildPatternPool(friendships, progress) {
+    return P.patterns.map((p) => ({
+      id: p.id,
+      part: p.part,
+      name: p.name,
+      none: !!p.none,
+      unlocked: isUnlocked(p, friendships, progress),
+      used: !!(progress && progress[p.id] && progress[p.id].used),
+    }));
   }
 
-  function patternLabel(p) {
-    return p.name ? `${p.id} (${p.name})` : p.id;
+  // Patterns the roulette may draw for a part. No Sleeves / No Collar only when opted in.
+  function unlockedPatterns(ctx, part) {
+    return (ctx.patternPool || []).filter((p) => p.part === part && p.unlocked && (!p.none || ctx.includeNone));
+  }
+
+  function unusedPatterns(ctx, part) {
+    return unlockedPatterns(ctx, part).filter((p) => !p.used);
   }
 
   // Why a category can't be rolled right now, or null if it can.
@@ -74,9 +99,9 @@
       case 'detail':
         return D.details.length ? null : 'No trim / detail challenges are available.';
       case 'pattern':
-        return D.patternPieces.some((p) => unlockedPatterns(ctx, p.code).length)
+        return P.PARTS.some((p) => unlockedPatterns(ctx, p.part).length)
           ? null
-          : 'Pattern Piece is on, but no patterns are marked unlocked. Unlock some in the Pattern catalogue.';
+          : 'Pattern Piece is on, but no patterns are unlocked. Check friendship stars and overrides in the Pattern library.';
       default:
         return 'Unknown category.';
     }
@@ -173,47 +198,63 @@
     },
 
     pattern(ctx) {
-      const pieces = D.patternPieces.filter((p) => unlockedPatterns(ctx, p.code).length);
-      const piece = pick(pieces);
-      const mode = randInt(2) === 0 ? 'random' : 'unused';
-      if (mode === 'random') return randomPatternResult(ctx, piece.code);
-      const unused = unusedPatterns(ctx, piece.code);
-      return makeResult('pattern', {
-        subtype: `${piece.label} · Choose Unused`,
-        piece: piece.code,
-        mode: 'unused',
-        result: `${piece.label}: you choose any unlocked, never-used pattern`,
-        rule: unused.length
-          ? `Pick one of your ${unused.length} unused ${piece.label.toLowerCase()} patterns. You choose — it isn't random.`
-          : `There are no unused ${piece.label.toLowerCase()} patterns left. You can convert this to a Random Pattern.`,
-        needsChoice: unused.length > 0,
-        needsConversion: unused.length === 0,
-        choice: null,
-        key: `pattern|${piece.code}|unused`,
-      });
+      const parts = P.PARTS.filter((p) => unlockedPatterns(ctx, p.part).length);
+      const skipped = P.PARTS.filter((p) => !parts.includes(p)).map((p) => p.label);
+      const part = pick(parts);
+      const label = part.label.toLowerCase();
+      const notes = [];
+      let r;
+      if (randInt(2) === 0) {
+        r = randomPatternResult(ctx, part.part);
+      } else {
+        const unused = unusedPatterns(ctx, part.part);
+        if (unused.length) {
+          r = makeResult('pattern', {
+            subtype: `${part.label} · Choose Unused`,
+            part: part.part,
+            mode: 'unused',
+            result: `${part.label}: you choose an unused pattern`,
+            rule: `Pick any of your ${unused.length} unlocked, never-used ${label} patterns. You choose — it isn't random.`,
+            needsChoice: true,
+            choice: null,
+            choiceName: null,
+            constraints: [COMMISSION_FIRST, "The app can't check which pieces fit together — check compatibility yourself."],
+            key: `pattern|${part.part}|unused`,
+          });
+        } else {
+          r = randomPatternResult(ctx, part.part);
+          notes.push(`Rolled Choose Unused, but every unlocked ${label} pattern is already used, so this fell back to Random Pattern.`);
+        }
+      }
+      if (skipped.length) notes.push(`Not rolled (no unlocked patterns): ${skipped.join(', ')}.`);
+      if (notes.length) r.note = notes.join(' ');
+      return r;
     },
   };
 
-  function randomPatternResult(ctx, code) {
-    const label = pieceLabel(code);
-    const pool = unlockedPatterns(ctx, code);
+  function randomPatternResult(ctx, part) {
+    const label = partLabel(part);
+    const pool = unlockedPatterns(ctx, part);
     if (!pool.length) return null;
     const p = pick(pool);
     return makeResult('pattern', {
       subtype: `${label} · Random Pattern`,
-      piece: code,
+      part,
       mode: 'random',
-      result: `${label}: ${patternLabel(p)}`,
-      rule: `Use exactly ${p.id}. This is binding unless it's impossible or incompatible.`,
+      result: `${label}: ${p.name}`,
+      rule: p.none
+        ? `Leave this part off entirely (${p.name}). Binding unless it's impossible.`
+        : `Use exactly the ${p.name}. Binding unless it's impossible or incompatible — previously used patterns count too.`,
       choice: p.id,
-      constraints: [COMMISSION_FIRST, 'Check compatibility with the other pieces yourself.'],
-      key: `pattern|${code}|random|${p.id}`,
+      choiceName: p.name,
+      constraints: [COMMISSION_FIRST, "The app can't check which pieces fit together — check compatibility yourself."],
+      key: `pattern|${part}|random|${p.id}`,
     });
   }
 
   // Turn a "Choose Unused" result with nothing left into a Random Pattern result.
   function convertToRandom(result, ctx) {
-    const converted = randomPatternResult(ctx, result.piece);
+    const converted = randomPatternResult(ctx, result.part);
     if (converted) converted.note = 'Converted from Choose Unused — no unused patterns were left.';
     return converted;
   }
@@ -264,7 +305,7 @@
 
   const API = {
     randInt, pick, eligibleCategories, rollCategory, rollSlot, rollConcept,
-    convertToRandom, unusedPatterns, unlockedPatterns, fabricPool, patternLabel, pieceLabel,
+    convertToRandom, unusedPatterns, unlockedPatterns, fabricPool, partLabel, isUnlocked, buildPatternPool,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;

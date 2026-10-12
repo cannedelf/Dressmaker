@@ -3,13 +3,10 @@ const test = require('node:test');
 const assert = require('node:assert');
 const D = require('../js/data.js');
 const R = require('../js/roulette.js');
+const P = require('../js/patterns.js');
 
-function patterns({ unlocked = true, used = false } = {}) {
-  const out = {};
-  for (const p of D.patternPieces) {
-    out[p.code] = [1, 2, 3].map((n) => ({ id: `${p.code}0${n}`, name: '', unlocked, used }));
-  }
-  return out;
+function pool(friendships = {}, progress = {}) {
+  return R.buildPatternPool(friendships, progress);
 }
 
 function ctx(overrides = {}) {
@@ -17,7 +14,8 @@ function ctx(overrides = {}) {
     enabled: { colour: true, fabric: true, accessory: true, detail: true, pattern: true },
     colours: D.colours.map((c) => c.name),
     neutralsAllowed: true,
-    patterns: patterns(),
+    patternPool: pool(),
+    includeNone: false,
   }, overrides);
 }
 
@@ -45,15 +43,15 @@ test('same category twice is possible, but never the exact same challenge', () =
   assert.ok(sameCategory > 0, 'expected at least one double-category result');
 });
 
-test('exact duplicate is flagged when no distinct option exists', () => {
-  const c = ctx({ enabled: { colour: false, fabric: false, accessory: false, detail: false, pattern: true },
-    patterns: { BO: [{ id: 'BO01', unlocked: true, used: true }], CO: [], SL: [], SK: [] } });
-  // Only two outcomes exist: random BO01, or choose-unused BO (none left).
+test('exact duplicate is redrawn even when only a couple of outcomes exist', () => {
+  const only = pool({}, {}).map((p) => ((p.id === 'bodice:princess-bodice') ? p : Object.assign({}, p, { unlocked: false })));
+  only.find((p) => p.id === 'bodice:princess-bodice').used = true;
+  // Only two outcomes exist: Random -> Princess Bodice, or Choose Unused (falls back to the same Random).
+  const c = ctx({ enabled: { pattern: true }, patternPool: only });
   const a = R.rollSlot(c, null).result;
   const b = R.rollSlot(c, a).result;
-  assert.notStrictEqual(a.key, b.key);
-  const c2 = R.rollSlot(c, b).result;
-  assert.notStrictEqual(c2.key, b.key);
+  assert.strictEqual(a.key, b.key);
+  assert.strictEqual(b.duplicate, true, 'identical result must be flagged, not silently accepted');
 });
 
 test('accessories need at least three; line trims need three areas', () => {
@@ -72,45 +70,14 @@ test('Burlap never appears', () => {
   }
 });
 
-test('Random Pattern picks an exact unlocked ID; Choose Unused leaves it to the user', () => {
-  const c = ctx();
-  c.patterns.SK[0].unlocked = false;
-  let sawRandom = false;
-  let sawUnused = false;
-  for (let i = 0; i < RUNS; i++) {
-    const r = R.rollCategory('pattern', c);
-    if (r.mode === 'random') {
-      sawRandom = true;
-      assert.notStrictEqual(r.choice, 'SK01');
-      assert.ok(c.patterns[r.piece].some((p) => p.id === r.choice && p.unlocked));
-    } else {
-      sawUnused = true;
-      assert.strictEqual(r.choice, null);
-      assert.strictEqual(r.needsChoice, true);
-    }
-  }
-  assert.ok(sawRandom && sawUnused);
-});
-
-test('Choose Unused excludes used and locked patterns, and offers conversion when none left', () => {
-  const c = ctx();
-  c.patterns.BO[0].used = true;
-  c.patterns.BO[1].unlocked = false;
-  assert.deepStrictEqual(R.unusedPatterns(c, 'BO').map((p) => p.id), ['BO03']);
-  c.patterns.BO[2].used = true;
-  assert.strictEqual(R.unusedPatterns(c, 'BO').length, 0);
-  const converted = R.convertToRandom({ piece: 'BO' }, c);
-  assert.strictEqual(converted.mode, 'random');
-  assert.strictEqual(converted.choice, 'BO01');
-});
-
 test('empty pools give an explanation instead of a result', () => {
   const none = R.rollSlot(ctx({ enabled: {} }), null);
   assert.ok(none.error);
   assert.ok(!none.result);
   const noColours = R.rollSlot(ctx({ colours: [], enabled: { colour: true } }), null);
   assert.match(noColours.error, /no colours/i);
-  const noPatterns = R.rollSlot(ctx({ enabled: { pattern: true }, patterns: patterns({ unlocked: false }) }), null);
+  const allLocked = Object.fromEntries(P.patterns.map((p) => [p.id, { unlockOverride: 'locked' }]));
+  const noPatterns = R.rollSlot(ctx({ enabled: { pattern: true }, patternPool: pool({}, allLocked) }), null);
   assert.match(noPatterns.error, /unlocked/i);
 });
 

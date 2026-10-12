@@ -143,18 +143,45 @@
       <h3>Roll history</h3>
       <ol id="log" class="log"></ol>
       <button id="btn-finish" class="btn primary" type="button">Finish &amp; start a new commission</button>
-      <p class="hint">Finishing saves this commission to your past commissions and marks any patterns you used as used.</p>
+      <p class="hint">Finishing saves this commission to your past commissions. Patterns are only marked used when you press <em>Mark pattern as used</em> on a card or tick them in the Pattern library.</p>
     </section>
 
-    <!-- Patterns -->
-    <section class="card" aria-labelledby="h-patterns">
-      <details id="patterns-details">
-        <summary><h2 id="h-patterns"><span aria-hidden="true">📐</span> Pattern catalogue</h2></summary>
-        <p class="hint">These IDs are our own index labels, not official in-game IDs. Tick what you've unlocked and what you've already used.</p>
-        <label>Search
-          <input id="pattern-search" type="search" placeholder="e.g. BO03 or puff">
+    <!-- Friendship stars -->
+    <section class="card" aria-labelledby="h-friends">
+      <details>
+        <summary><h2 id="h-friends"><span aria-hidden="true">💛</span> Friendship stars</h2></summary>
+        <p class="hint">Copy each client's stars from your current save. Their patterns unlock automatically.</p>
+        <div id="friend-list" class="friends"></div>
+        <p id="friend-news" class="news" role="status" aria-live="polite"></p>
+      </details>
+    </section>
+
+    <!-- Pattern library -->
+    <section class="card" aria-labelledby="h-library">
+      <details>
+        <summary><h2 id="h-library"><span aria-hidden="true">📐</span> Pattern library</h2></summary>
+        <p class="hint">All 155 patterns from the Dressmaker Wiki (v0.7.0). Tick <strong>Used</strong> once a pattern is in a finished dress. If your save disagrees with the wiki, use the Unlock override.</p>
+        <div class="tabs" role="tablist" aria-label="Pattern part" id="lib-tabs"></div>
+        <div class="grid2">
+          <label>Search
+            <input id="lib-search" type="search" autocomplete="off" placeholder="e.g. Corset or Edith">
+          </label>
+          <label>Show
+            <select id="lib-filter">
+              <option value="all">All</option>
+              <option value="ready">Unlocked &amp; unused</option>
+              <option value="unlocked">Unlocked</option>
+              <option value="locked">Locked</option>
+              <option value="unused">Unused</option>
+            </select>
+          </label>
+        </div>
+        <p id="lib-counts" class="hint"></p>
+        <ul id="lib-list" class="lib-list" role="tabpanel"></ul>
+        <label class="check">
+          <input id="include-none" type="checkbox">
+          <span>Let Pattern Piece rolls pick <em>No Sleeves</em> / <em>No Collar</em> (off by default, since the challenge needs a real piece)</span>
         </label>
-        <div id="pattern-tables"></div>
       </details>
     </section>
 
@@ -177,7 +204,7 @@
           <li><strong>Valid reroll reasons:</strong> exact duplicate, conflicts with the commission, not unlocked or incompatible, or another genuinely impossible situation (add a note). "I don't like how it looks" isn't a valid reason.</li>
           <li><strong>Accessories:</strong> at least 3 pieces, arranged on purpose. Lace trim and trim (including piping) count as 3 distinct decorated areas.</li>
           <li><strong>Fabric:</strong> it must have a meaningful visible presence. Burlap is never rolled.</li>
-          <li><strong>Pattern Piece:</strong> a Random Pattern is binding unless it's impossible. With Choose Unused, you pick any unlocked pattern you've never used.</li>
+          <li><strong>Pattern Piece:</strong> a Random Pattern is binding unless it's impossible, and used patterns can come up again. With Choose Unused, you pick any unlocked pattern you've never used. If none are left, it switches to Random Pattern. The app can't tell which pieces fit together, so reroll a genuinely incompatible result.</li>
           <li><strong>The app doesn't check</strong> Quality, Gothic, Risqué, percentages, prices or compatibility. Check those yourself in the game.</li>
         </ul>
       </details>
@@ -236,6 +263,8 @@
   </dialog>
 
   <script src="js/data.js"></script>
+  <script src="js/patterns.js"></script>
+  <script src="js/state.js"></script>
   <script src="js/roulette.js"></script>
   <script src="js/app.js"></script>
 </body>

@@ -14,13 +14,20 @@ Open `index.html` in a browser. There's nothing to install. It also works as-is 
 
 Everything is saved in **this browser only**. Use *Save data → Export JSON* to back up or move to another device.
 
-## Editing the pools
+## Patterns & friendship
 
-All lists live in `js/data.js`: colours, colour uses, fabrics, print challenges, accessories, trim/detail challenges, concepts and reroll reasons. Patterns and the concept pool can also be edited inside the app.
+- **Friendship stars:** set each client's stars (0–5) to match your save. Patterns unlock automatically from the wiki's client + star thresholds.
+- **Pattern library:** all 155 wiki patterns (59 bodices, 46 skirts, 30 sleeves, 20 collars), with Used ticks, notes and an unlock override (auto / force unlocked / force locked) for when your save disagrees with the wiki.
+- **No Sleeves / No Collar** are listed separately and left out of rolls unless you tick the option to include them.
+- Patterns are only marked used when you say so, never automatically.
 
-Still placeholders to check against the wiki / Google Sheet:
-- the colour list
-- the pattern catalogue (starts with `BO01–BO06`, `CO01–CO06`, etc., all unlocked)
+The data lives in `js/patterns.js` (transcribed from the Dressmaker Wiki, v0.7.0 Build 410). IDs are built from part + name, e.g. `bodice:corset-bodice`.
+
+Older saves upgrade automatically: commissions, history and settings are kept, and the old placeholder catalogue (BO01…) is kept in the save file untouched rather than guessed onto wiki names.
+
+## Editing the other pools
+
+Colours, colour uses, fabrics, print challenges, accessories, trim/detail challenges, concepts and reroll reasons are in `js/data.js`. The colour list is still a placeholder to check against the wiki.
 
 ## Tests
 
@@ -28,4 +35,4 @@ Still placeholders to check against the wiki / Google Sheet:
 node --test
 ```
 
-Covers the acceptance tests in the design spec (disabled categories, duplicates, slot independence, Burlap, pattern rules, empty pools).
+Covers the acceptance tests from both briefs: disabled categories, duplicates, Burlap, empty pools, friendship unlocks, Choose Unused, fallbacks, overrides and save migration.

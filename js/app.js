@@ -2,62 +2,15 @@
 (function () {
   const D = window.FR_DATA;
   const R = window.FR;
-  const STORAGE_KEY = 'crobat-sunshine-fashion-roulette-v1';
+  const P = window.FR_PATTERNS;
+  const S = window.FR_STATE;
+  const STORAGE_KEY = S.STORAGE_KEY;
   const $ = (id) => document.getElementById(id);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------- State ----------
 
-  function defaultPatterns() {
-    const out = {};
-    for (const p of D.patternPieces) {
-      out[p.code] = [];
-      for (let i = 1; i <= D.patternsPerPiece; i++) {
-        out[p.code].push({ id: `${p.code}${String(i).padStart(2, '0')}`, name: '', unlocked: true, used: false });
-      }
-    }
-    return out;
-  }
-
-  function blankCommission() {
-    return {
-      customer: '', brief: '', requirements: '', forbidden: '', fabrics: '', budget: '',
-      hasConcept: false, conceptName: '', rolledConcept: '', outcome: '', notes: '',
-    };
-  }
-
-  function blankSlots() {
-    return [{ current: null, locked: false, attempts: 0 }, { current: null, locked: false, attempts: 0 }];
-  }
-
-  function defaultState() {
-    return {
-      version: 1,
-      commission: blankCommission(),
-      enabled: Object.fromEntries(D.categories.map((c) => [c.id, true])),
-      colours: Object.fromEntries(D.colours.map((c) => [c.name, true])),
-      neutralsAllowed: true,
-      patterns: defaultPatterns(),
-      conceptPool: D.concepts.slice(),
-      slots: blankSlots(),
-      log: [],
-      past: [],
-    };
-  }
-
-  function normalise(raw) {
-    const base = defaultState();
-    const s = Object.assign(base, raw || {});
-    s.commission = Object.assign(blankCommission(), s.commission);
-    s.enabled = Object.assign(defaultState().enabled, s.enabled);
-    s.colours = Object.assign(defaultState().colours, s.colours);
-    s.patterns = Object.assign(defaultPatterns(), s.patterns);
-    if (!Array.isArray(s.slots) || s.slots.length !== 2) s.slots = blankSlots();
-    if (!Array.isArray(s.log)) s.log = [];
-    if (!Array.isArray(s.past)) s.past = [];
-    if (!Array.isArray(s.conceptPool)) s.conceptPool = D.concepts.slice();
-    return s;
-  }
+  const { blankCommission, blankSlots, defaultState, normalise } = S;
 
   function load() {
     try {
@@ -78,8 +31,19 @@
       enabled: state.enabled,
       colours: D.colours.map((c) => c.name).filter((n) => state.colours[n]),
       neutralsAllowed: state.neutralsAllowed,
-      patterns: state.patterns,
+      patternPool: R.buildPatternPool(state.friendships, state.patternProgress),
+      includeNone: state.includeNone,
     };
+  }
+
+  const NO_PROGRESS = { used: false, unlockOverride: 'auto', notes: '' };
+
+  function progressOf(id) {
+    return state.patternProgress[id] || NO_PROGRESS;
+  }
+
+  function setProgress(id, field, value) {
+    state.patternProgress[id] = Object.assign({}, progressOf(id), { [field]: value });
   }
 
   const esc = (s) => String(s == null ? '' : s)
@@ -268,16 +232,25 @@
     (r.notes || []).forEach((n) => warnings.push(n));
 
     let extra = '';
-    if (r.category === 'pattern' && r.mode === 'unused') {
+    if (r.category === 'pattern' && r.legacy) {
+      warnings.push('Rolled from the old placeholder catalogue. Reroll to use the wiki pattern library.');
+    } else if (r.category === 'pattern') {
+      const partName = R.partLabel(r.part).toLowerCase();
+      if (r.mode === 'unused') {
+        if (r.choice) {
+          extra = `<p class="chosen">✅ You chose: ${esc(r.choiceName || r.choice)}</p>
+            <button class="btn secondary small" data-act="choose" data-slot="${i}">Change choice</button>`;
+        } else if (!R.unusedPatterns(ctx(), r.part).length) {
+          extra = `<p class="warn">No unused ${esc(partName)} patterns are left.</p>
+            <button class="btn secondary small" data-act="convert" data-slot="${i}" ${slot.locked ? 'disabled' : ''}>Switch to Random Pattern</button>`;
+        } else {
+          extra = `<button class="btn secondary small" data-act="choose" data-slot="${i}">Choose pattern…</button>`;
+        }
+      }
       if (r.choice) {
-        const p = (state.patterns[r.piece] || []).find((x) => x.id === r.choice);
-        extra = `<p class="chosen">✅ You chose: ${esc(p ? R.patternLabel(p) : r.choice)}</p>
-          <button class="btn secondary small" data-act="choose" data-slot="${i}">Change choice</button>`;
-      } else if (r.needsConversion || !R.unusedPatterns(ctx(), r.piece).length) {
-        extra = `<p class="warn">No unused ${esc(R.pieceLabel(r.piece).toLowerCase())} patterns are left.</p>
-          <button class="btn secondary small" data-act="convert" data-slot="${i}" ${slot.locked ? 'disabled' : ''}>Convert to Random Pattern</button>`;
-      } else {
-        extra = `<button class="btn secondary small" data-act="choose" data-slot="${i}">Choose pattern…</button>`;
+        const used = progressOf(r.choice).used;
+        extra += `<button class="btn secondary small" data-act="used" data-slot="${i}" aria-pressed="${used}">
+          ${used ? '✅ Marked as used' : 'Mark pattern as used'}</button>`;
       }
     }
 
@@ -330,10 +303,16 @@
           save(); renderSlots();
           break;
         case 'choose': openChoose(i); break;
+        case 'used': {
+          const id = slot.current.choice;
+          setProgress(id, 'used', !progressOf(id).used);
+          save(); renderSlots(); renderLibrary();
+          break;
+        }
         case 'convert': {
           const converted = R.convertToRandom(slot.current, ctx());
           if (!converted) { showNotice('No unlocked patterns exist for that piece either. Reroll this slot instead.'); return; }
-          converted.rerollReason = 'Converted (no unused patterns)';
+          converted.rerollReason = 'Switched to Random (no unused patterns)';
           slot.current = converted;
           addLog({ slot: i + 1, action: 'Convert', reason: 'No unused patterns left', result: converted.result, outcome: converted });
           save(); renderSlots([i]); renderSummary(); renderLog();
@@ -383,7 +362,7 @@
   function openChoose(i) {
     chooseTarget = i;
     const r = state.slots[i].current;
-    $('dlg-pattern-title').textContent = `Choose an unused ${R.pieceLabel(r.piece).toLowerCase()} pattern`;
+    $('dlg-pattern-title').textContent = `Choose an unused ${R.partLabel(r.part).toLowerCase()} pattern`;
     $('choose-search').value = '';
     renderChooseList();
     $('dlg-pattern').showModal();
@@ -392,10 +371,9 @@
   function renderChooseList() {
     const r = state.slots[chooseTarget].current;
     const q = $('choose-search').value.trim().toLowerCase();
-    const list = R.unusedPatterns(ctx(), r.piece)
-      .filter((p) => !q || p.id.toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q));
+    const list = R.unusedPatterns(ctx(), r.part).filter((p) => !q || p.name.toLowerCase().includes(q));
     $('choose-list').innerHTML = list.length
-      ? list.map((p) => `<li><button class="btn" type="button" data-pid="${esc(p.id)}">${esc(R.patternLabel(p))}</button></li>`).join('')
+      ? list.map((p) => `<li><button class="btn" type="button" data-pid="${esc(p.id)}">${esc(p.name)}</button></li>`).join('')
       : '<li class="hint">No matching unused patterns.</li>';
   }
 
@@ -406,7 +384,8 @@
       if (!btn) return;
       const r = state.slots[chooseTarget].current;
       r.choice = btn.dataset.pid;
-      addLog({ slot: chooseTarget + 1, action: 'Chose pattern', result: r.choice });
+      r.choiceName = btn.textContent;
+      addLog({ slot: chooseTarget + 1, action: 'Chose pattern', result: r.choiceName });
       save();
       $('dlg-pattern').close();
       renderSlots(); renderSummary(); renderLog();
@@ -418,7 +397,7 @@
   function resultLine(r) {
     if (!r) return '(not rolled)';
     let line = `${r.categoryLabel} — ${r.result}`;
-    if (r.category === 'pattern' && r.mode === 'unused') line += r.choice ? ` → ${r.choice}` : ' → (not chosen yet)';
+    if (r.category === 'pattern' && r.mode === 'unused') line += r.choice ? ` → ${r.choiceName || r.choice}` : ' → (not chosen yet)';
     return `${line}\n   ${r.rule}`;
   }
 
@@ -479,16 +458,8 @@
       const pending = state.slots.some((s) => s.current && s.current.mode === 'unused' && !s.current.choice);
       const msg = pending
         ? 'One slot still needs a pattern chosen. Finish anyway?'
-        : 'Save this commission to your past commissions and start a new one?';
+        : 'Save this commission to your past commissions and start a new one?\n\n(Patterns are only marked used if you pressed "Mark pattern as used".)';
       if (!confirm(msg)) return;
-      // Mark patterns that ended up in the dress as used.
-      for (const s of state.slots) {
-        const r = s.current;
-        if (r && r.category === 'pattern' && r.choice) {
-          const p = (state.patterns[r.piece] || []).find((x) => x.id === r.choice);
-          if (p) p.used = true;
-        }
-      }
       state.past.unshift({
         finishedAt: new Date().toISOString(),
         commission: state.commission,
@@ -513,7 +484,7 @@
         const outcome = { success: '🎉 Succeeded', partial: 'Partly', fail: "Didn't work out" }[c.outcome] || 'No outcome recorded';
         return `<div class="past-item">
           <h3>${esc(c.customer || 'Unnamed commission')} <small class="meta">· ${new Date(p.finishedAt).toLocaleDateString()}</small></h3>
-          ${p.results.map((r, i) => `<p>${i + 1}) ${r ? esc(`${r.categoryLabel} — ${r.result}${r.mode === 'unused' && r.choice ? ` → ${r.choice}` : ''}`) : '(not rolled)'}</p>`).join('')}
+          ${p.results.map((r, i) => `<p>${i + 1}) ${r ? esc(`${r.categoryLabel} — ${r.result}${r.mode === 'unused' && r.choice ? ` → ${r.choiceName || r.choice}` : ''}`) : '(not rolled)'}</p>`).join('')}
           <p class="meta">${esc(outcome)}${c.notes ? ` · ${esc(c.notes)}` : ''}</p>
           <button class="btn link small" type="button" data-del="${n}">Delete</button>
         </div>`;
@@ -530,64 +501,171 @@
     });
   }
 
-  // ---------- Pattern catalogue ----------
+  // ---------- Friendship stars ----------
 
-  function renderPatterns() {
-    const q = $('pattern-search').value.trim().toLowerCase();
-    $('pattern-tables').innerHTML = D.patternPieces.map((piece) => {
-      const all = state.patterns[piece.code] || [];
-      const rows = all.filter((p) => !q || p.id.toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q));
-      const unlocked = all.filter((p) => p.unlocked).length;
-      const unused = all.filter((p) => p.unlocked && !p.used).length;
-      return `<h3>${esc(piece.label)} (${piece.code}) <small class="meta">· ${unlocked} unlocked, ${unused} unused</small></h3>
-        <table class="ptable">
-          <thead><tr><th>ID</th><th>Name / note</th><th class="c">Unlocked</th><th class="c">Used</th><th class="c"><span class="sr">Remove</span></th></tr></thead>
-          <tbody>${rows.map((p) => `
-            <tr>
-              <td>${esc(p.id)}</td>
-              <td><input type="text" aria-label="Name for ${esc(p.id)}" data-piece="${piece.code}" data-pid="${esc(p.id)}" data-field="name" value="${esc(p.name)}"></td>
-              <td class="c"><input type="checkbox" aria-label="${esc(p.id)} unlocked" data-piece="${piece.code}" data-pid="${esc(p.id)}" data-field="unlocked" ${p.unlocked ? 'checked' : ''}></td>
-              <td class="c"><input type="checkbox" aria-label="${esc(p.id)} used" data-piece="${piece.code}" data-pid="${esc(p.id)}" data-field="used" ${p.used ? 'checked' : ''}></td>
-              <td class="c"><button class="btn link small" type="button" aria-label="Remove ${esc(p.id)}" data-remove="${esc(p.id)}" data-piece="${piece.code}">✕</button></td>
-            </tr>`).join('') || '<tr><td colspan="5" class="hint">No patterns match.</td></tr>'}
-          </tbody>
-        </table>
-        <form class="add-row" data-add="${piece.code}">
-          <label>New ID <input type="text" name="id" placeholder="${piece.code}${String(all.length + 1).padStart(2, '0')}" autocomplete="off"></label>
-          <label>Name <input type="text" name="name" placeholder="optional" autocomplete="off"></label>
-          <button class="btn secondary small" type="submit">Add</button>
-        </form>`;
+  function unlockedIds() {
+    return new Set(R.buildPatternPool(state.friendships, state.patternProgress).filter((p) => p.unlocked).map((p) => p.id));
+  }
+
+  function starText(n) {
+    return '★'.repeat(n) + '☆'.repeat(P.MAX_STARS - n);
+  }
+
+  function renderFriends() {
+    const unlocked = unlockedIds();
+    $('friend-list').innerHTML = P.CLIENTS.map((client) => {
+      const stars = state.friendships[client] || 0;
+      const theirs = P.patterns.filter((p) => p.unlock.kind === 'friendship' && p.unlock.client === client);
+      const have = theirs.filter((p) => unlocked.has(p.id)).length;
+      const next = theirs.filter((p) => p.unlock.stars > stars).map((p) => p.unlock.stars);
+      const nextStar = next.length ? Math.min(...next) : null;
+      const nextCount = theirs.filter((p) => p.unlock.stars === nextStar).length;
+      const nextText = nextStar
+        ? `Next: ★${nextStar} unlocks ${nextCount} pattern${nextCount > 1 ? 's' : ''}`
+        : 'All their patterns unlocked';
+      return `<div class="friend">
+        <span class="fname">${esc(client)}</span>
+        <span class="stepper">
+          <button class="btn secondary small" type="button" data-client="${esc(client)}" data-step="-1"
+            aria-label="Fewer stars for ${esc(client)}" ${stars <= 0 ? 'disabled' : ''}>−</button>
+          <input type="number" inputmode="numeric" min="0" max="${P.MAX_STARS}" value="${stars}"
+            data-client="${esc(client)}" aria-label="${esc(client)} friendship stars">
+          <button class="btn secondary small" type="button" data-client="${esc(client)}" data-step="1"
+            aria-label="More stars for ${esc(client)}" ${stars >= P.MAX_STARS ? 'disabled' : ''}>+</button>
+        </span>
+        <span class="stars" aria-hidden="true">${starText(stars)}</span>
+        <span class="meta">${have}/${theirs.length} patterns · ${esc(nextText)}</span>
+      </div>`;
     }).join('');
   }
 
-  function bindPatterns() {
-    $('pattern-search').addEventListener('input', renderPatterns);
-    const box = $('pattern-tables');
-    box.addEventListener('change', (e) => {
-      const el = e.target;
-      if (!el.dataset.field) return;
-      const p = state.patterns[el.dataset.piece].find((x) => x.id === el.dataset.pid);
-      if (!p) return;
-      p[el.dataset.field] = el.type === 'checkbox' ? el.checked : el.value.trim();
+  function setStars(client, value) {
+    const before = unlockedIds();
+    const old = state.friendships[client] || 0;
+    state.friendships[client] = S.clampStars(value);
+    const fresh = P.patterns.filter((p) => !before.has(p.id) && unlockedIds().has(p.id));
+    $('friend-news').textContent = state.friendships[client] > old && fresh.length
+      ? `New for ${client} ★${state.friendships[client]}: ${fresh.map((p) => p.name).join(', ')}`
+      : '';
+    save();
+    renderFriends(); renderLibrary(); renderSlots(); renderNoticeForPools();
+  }
+
+  function bindFriends() {
+    $('friend-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-step]');
+      if (!btn) return;
+      const client = btn.dataset.client;
+      setStars(client, (state.friendships[client] || 0) + Number(btn.dataset.step));
+      const again = document.querySelector(`#friend-list button[data-client="${client}"][data-step="${btn.dataset.step}"]`);
+      if (again && !again.disabled) again.focus();
+    });
+    $('friend-list').addEventListener('change', (e) => {
+      if (e.target.matches('input[data-client]')) setStars(e.target.dataset.client, e.target.value);
+    });
+  }
+
+  // ---------- Pattern library ----------
+
+  let libTab = 'bodice';
+
+  function unlockText(p) {
+    if (p.none) return 'Picker choice from the start · not a numbered pattern';
+    return p.unlock.kind === 'start' ? 'Starting pattern' : `${p.unlock.client} · ★${p.unlock.stars}`;
+  }
+
+  function renderLibrary() {
+    $('lib-tabs').innerHTML = P.PARTS.map((part) => `
+      <button type="button" role="tab" id="tab-${part.part}" data-tab="${part.part}"
+        aria-selected="${part.part === libTab}" aria-controls="lib-list" tabindex="${part.part === libTab ? 0 : -1}">${esc(part.plural)}</button>`).join('');
+    $('include-none').checked = !!state.includeNone;
+
+    const unlocked = unlockedIds();
+    const q = $('lib-search').value.trim().toLowerCase();
+    const filter = $('lib-filter').value;
+    const inPart = P.patterns.filter((p) => p.part === libTab);
+    // Picker choices first, then the wiki's order.
+    const ordered = inPart.filter((p) => p.none).concat(inPart.filter((p) => !p.none));
+    const rows = ordered.filter((p) => {
+      const isUnlocked = unlocked.has(p.id);
+      const used = progressOf(p.id).used;
+      if (q && !p.name.toLowerCase().includes(q) && !unlockText(p).toLowerCase().includes(q)) return false;
+      if (filter === 'unlocked') return isUnlocked;
+      if (filter === 'locked') return !isUnlocked;
+      if (filter === 'unused') return !used;
+      if (filter === 'ready') return isUnlocked && !used;
+      return true;
+    });
+
+    const numbered = inPart.filter((p) => !p.none);
+    const nUnlocked = numbered.filter((p) => unlocked.has(p.id)).length;
+    const nReady = numbered.filter((p) => unlocked.has(p.id) && !progressOf(p.id).used).length;
+    const label = P.PARTS.find((x) => x.part === libTab).plural;
+    $('lib-counts').textContent = `${label}: ${nUnlocked} of ${numbered.length} unlocked · ${nReady} unlocked & unused`;
+
+    $('lib-list').setAttribute('aria-labelledby', `tab-${libTab}`);
+    $('lib-list').innerHTML = rows.length ? rows.map((p) => {
+      const prog = progressOf(p.id);
+      const isUnlocked = unlocked.has(p.id);
+      const overridden = prog.unlockOverride !== 'auto';
+      return `<li class="lib-row${isUnlocked ? '' : ' is-locked'}${p.none ? ' is-none' : ''}">
+        <div class="lib-main">
+          <strong>${esc(p.name)}</strong>
+          <span class="meta">${esc(unlockText(p))}</span>
+        </div>
+        <span class="status ${isUnlocked ? 'on' : 'off'}">${isUnlocked ? '🔓 Unlocked' : '🔒 Locked'}${overridden ? ' <em>(override)</em>' : ''}</span>
+        <label class="lib-used"><input type="checkbox" data-id="${esc(p.id)}" data-field="used" ${prog.used ? 'checked' : ''}> Used</label>
+        <details class="lib-more"${overridden || prog.notes ? ' open' : ''}>
+          <summary>Override / notes${prog.notes ? ' ✎' : ''}</summary>
+          <label class="lib-ovr">Unlock
+            <select data-id="${esc(p.id)}" data-field="unlockOverride" aria-label="Unlock override for ${esc(p.name)}">
+              <option value="auto" ${prog.unlockOverride === 'auto' ? 'selected' : ''}>Auto (from friendship)</option>
+              <option value="unlocked" ${prog.unlockOverride === 'unlocked' ? 'selected' : ''}>Force unlocked</option>
+              <option value="locked" ${prog.unlockOverride === 'locked' ? 'selected' : ''}>Force locked</option>
+            </select>
+          </label>
+          <input class="lib-notes" type="text" data-id="${esc(p.id)}" data-field="notes" value="${esc(prog.notes)}"
+            placeholder="Notes" aria-label="Notes for ${esc(p.name)}" autocomplete="off">
+        </details>
+      </li>`;
+    }).join('') : '<li class="hint">No patterns match.</li>';
+  }
+
+  function bindLibrary() {
+    $('lib-search').addEventListener('input', renderLibrary);
+    $('lib-filter').addEventListener('change', renderLibrary);
+    $('include-none').addEventListener('change', (e) => {
+      state.includeNone = e.target.checked;
       save();
-      if (el.type === 'checkbox') { renderPatterns(); renderNoticeForPools(); renderSlots(); }
     });
-    box.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-remove]');
-      if (!btn || !confirm(`Remove ${btn.dataset.remove}?`)) return;
-      const list = state.patterns[btn.dataset.piece];
-      list.splice(list.findIndex((x) => x.id === btn.dataset.remove), 1);
-      save(); renderPatterns(); renderNoticeForPools();
+    const tabs = $('lib-tabs');
+    tabs.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-tab]');
+      if (!btn) return;
+      libTab = btn.dataset.tab;
+      renderLibrary();
+      $(`tab-${libTab}`).focus();
     });
-    box.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const form = e.target;
-      const code = form.dataset.add;
-      const list = state.patterns[code];
-      const id = (form.elements.id.value.trim() || form.elements.id.placeholder).toUpperCase();
-      if (list.some((x) => x.id === id)) { alert(`${id} already exists.`); return; }
-      list.push({ id, name: form.elements.name.value.trim(), unlocked: true, used: false });
-      save(); renderPatterns(); renderNoticeForPools();
+    tabs.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const order = P.PARTS.map((p) => p.part);
+      const n = order.indexOf(libTab) + (e.key === 'ArrowRight' ? 1 : -1);
+      libTab = order[(n + order.length) % order.length];
+      renderLibrary();
+      $(`tab-${libTab}`).focus();
+    });
+    $('lib-list').addEventListener('change', (e) => {
+      const el = e.target;
+      const id = el.dataset.id;
+      if (!id) return;
+      if (el.dataset.field === 'notes') {
+        setProgress(id, 'notes', el.value.trim());
+        save();
+        return;
+      }
+      setProgress(id, el.dataset.field, el.type === 'checkbox' ? el.checked : el.value);
+      save();
+      renderLibrary(); renderFriends(); renderSlots(); renderNoticeForPools();
     });
   }
 
@@ -634,7 +712,8 @@
     renderSlots();
     renderSummary();
     renderLog();
-    renderPatterns();
+    renderFriends();
+    renderLibrary();
     renderPast();
     renderNoticeForPools();
   }
@@ -647,7 +726,8 @@
   bindChoose();
   bindSummary();
   bindPast();
-  bindPatterns();
+  bindFriends();
+  bindLibrary();
   bindData();
   renderAll();
 })();

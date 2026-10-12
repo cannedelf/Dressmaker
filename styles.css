@@ -215,3 +215,57 @@ footer { text-align: center; color: var(--plum-soft); padding: 8px 16px 32px; fo
 }
 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Friendship stars */
+.friends { display: grid; gap: 6px; }
+.friend {
+  display: grid; grid-template-columns: 90px auto 1fr; grid-template-areas: "name step stars" "meta meta meta";
+  align-items: center; gap: 2px 12px;
+  background: #fff; border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px;
+}
+.friend .fname { grid-area: name; font-weight: 800; }
+.friend .stepper { grid-area: step; display: inline-flex; align-items: center; gap: 4px; }
+.friend .stepper .btn { min-width: 40px; padding: 4px 0; font-size: 1.1rem; }
+.friend input[type="number"] {
+  width: 3.2em; text-align: center; font: inherit; font-weight: 800; color: var(--plum);
+  border: 2px solid var(--line); border-radius: 10px; padding: 5px 2px; background: var(--peach-2);
+}
+.friend .stars { grid-area: stars; color: var(--butter-deep); font-size: 1.15rem; letter-spacing: 2px; }
+.friend .meta { grid-area: meta; font-size: .85rem; color: var(--plum-soft); }
+@media (max-width: 420px) {
+  .friend { grid-template-columns: 1fr auto; grid-template-areas: "name step" "stars stars" "meta meta"; }
+}
+.news:not(:empty) { background: var(--butter-soft); border: 2px solid var(--butter-deep); border-radius: 12px; padding: 8px 12px; font-weight: 700; }
+
+/* Pattern library */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.tabs button {
+  font: inherit; font-weight: 800; cursor: pointer; min-height: 40px;
+  background: #fff; color: var(--plum); border: 2px solid var(--line); border-radius: 999px; padding: 6px 14px;
+}
+.tabs button[aria-selected="true"] { background: var(--strawberry); border-color: var(--strawberry); color: #fff; }
+.lib-list { list-style: none; padding: 0; margin: 4px 0 12px; }
+.lib-row {
+  display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: "main status used" "more more more";
+  gap: 2px 14px; align-items: center;
+  border-bottom: 1px solid var(--line); padding: 8px 2px;
+}
+.lib-row.is-locked .lib-main strong { color: var(--plum-soft); }
+.lib-row.is-none { background: var(--butter-soft); border-radius: 12px; padding: 10px; }
+.lib-main { grid-area: main; display: flex; flex-direction: column; }
+.lib-main .meta { font-size: .85rem; color: var(--plum-soft); }
+.status { grid-area: status; font-size: .85rem; font-weight: 800; white-space: nowrap; }
+.status.on { color: var(--ok); }
+.status.off { color: var(--plum-soft); }
+.lib-used { grid-area: used; display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; }
+.lib-used input { width: 20px; height: 20px; accent-color: var(--strawberry); }
+.lib-more { grid-area: more; font-size: .88rem; }
+.lib-more > summary { font-weight: 600; color: var(--plum-soft); padding: 2px 0; width: fit-content; }
+.lib-more[open] { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.lib-more[open] > summary { flex-basis: 100%; margin: 0; }
+.lib-ovr { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; }
+.lib-ovr select { margin: 0; padding: 5px 8px; width: auto; }
+.lib-notes { flex: 1 1 180px; margin: 0 !important; padding: 5px 9px !important; }
+@media (max-width: 560px) {
+  .lib-row { grid-template-columns: 1fr auto auto; grid-template-areas: "main main main" "status used ." "more more more"; }
+}

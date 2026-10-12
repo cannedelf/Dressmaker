@@ -82,16 +82,7 @@
       { name: 'Asymmetric detail', rule: 'Decorate one side differently from the other, on purpose.' },
     ],
 
-    patternPieces: [
-      { code: 'BO', label: 'Bodice' },
-      { code: 'CO', label: 'Collar' },
-      { code: 'SL', label: 'Sleeves' },
-      { code: 'SK', label: 'Skirt' },
-    ],
-
-    // PLACEHOLDER: our own index labels, not official in-game IDs.
-    // Replace with the reviewed export from the Google Sheet.
-    patternsPerPiece: 6,
+    // Pattern library: see js/patterns.js.
 
     concepts: [
       'Food: Strawberry', 'Food: Lemon tart', 'Food: Blueberry', 'Food: Macaron', 'Food: Honeycomb',
